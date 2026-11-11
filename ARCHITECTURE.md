@@ -53,11 +53,13 @@ To balance resource consumption in constrained environments (such as serverless 
 
 ---
 
-## 4. Production SLA (≤ 60s) & 2-Minute Pre-Spawn Overlap Handover
+## 4. Production SLA (≤ 60s) & 30-Second Watcher Cadence
 
-To ensure dependable real-world responsiveness without unbounded agent polling overhead, the system defines a strict **Service Level Agreement (SLA ≤ 60s)**:
+To ensure dependable real-world responsiveness without unbounded agent polling overhead, the system defines a strict, enterprise-grade **Service Level Agreement (SLA ≤ 60s)**:
 
-1. **Nominal State (Active Watcher)**: Messages are caught within **1 ~ 5 seconds** via open TCP long-polling, with cached context queries delivering responses in under 2 ~ 4 seconds.
+1. **30-Second Long-Polling Cadence**:
+   - Replaces fragile sub-second over-tuning with a rock-solid **30-second polling cadence** (`long_poll_timeout=30`).
+   - Telegram server flushes messages down the open HTTP stream immediately upon receipt (0~30s detection window), yielding complete responses in **under 30~45 seconds** with zero socket thrashing or CPU waste.
 2. **2-Minute Pre-Spawn Overlap Handover**:
    - In agentic runtimes with bounded execution terms (e.g. 50 minutes), the supervisor monitors term age (`term_age = now - started_at`).
    - At **minute 48** (2 minutes prior to term expiration, `overlap_lead_seconds=120`), the supervisor flags `overlap_due = True`.
