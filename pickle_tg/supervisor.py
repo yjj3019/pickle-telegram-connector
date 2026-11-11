@@ -22,15 +22,17 @@ class Supervisor:
 
     def inspect_status(
         self,
-        stale_threshold_seconds: int = 180,
-        term_limit_seconds: int = 3000
+        stale_threshold_seconds: int = 120,
+        term_limit_seconds: int = 3000,
+        overlap_lead_seconds: int = 120
     ) -> Dict[str, Any]:
-        """Inspect watcher operational state."""
+        """Inspect watcher operational state and lifecycle."""
         now = time.time()
         status: Dict[str, Any] = {
             "alive": False,
             "stale": False,
             "term_expired": False,
+            "overlap_due": False,
             "unhandled_count": 0,
             "heartbeat_age": None,
             "term_age": None,
@@ -54,6 +56,8 @@ class Supervisor:
                             continue
                         try:
                             item = json.loads(line)
+                            if item.get("message_id") is None:
+                                continue
                             k = f"{item.get('chat_id')}:{item.get('message_id')}"
                             if k not in handled:
                                 status["unhandled_count"] += 1
@@ -62,7 +66,7 @@ class Supervisor:
             except Exception:
                 pass
 
-        # Check heartbeat
+        # Check heartbeat and term lifecycle
         if os.path.exists(self.heartbeat_file):
             try:
                 with open(self.heartbeat_file, "r", encoding="utf-8") as f:
@@ -83,6 +87,9 @@ class Supervisor:
 
                 if t_age >= term_limit_seconds:
                     status["term_expired"] = True
+                elif t_age >= max(0, term_limit_seconds - overlap_lead_seconds):
+                    # Within overlap window (e.g. 48m into 50m term): trigger pre-spawn
+                    status["overlap_due"] = True
 
             except Exception:
                 status["stale"] = True
@@ -90,10 +97,10 @@ class Supervisor:
         return status
 
     def check_exit_code(self) -> int:
-        """Returns 0 if action needed (unhandled msgs, dead/stale watcher), 1 if quiet."""
+        """Returns 0 if action needed (unhandled msgs, dead/stale watcher, overlap due), 1 if quiet."""
         status = self.inspect_status()
         if status["unhandled_count"] > 0:
             return 0
-        if not status["alive"] or status["stale"] or status["term_expired"]:
+        if not status["alive"] or status["stale"] or status["term_expired"] or status["overlap_due"]:
             return 0
         return 1

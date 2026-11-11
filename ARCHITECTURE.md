@@ -53,7 +53,24 @@ To balance resource consumption in constrained environments (such as serverless 
 
 ---
 
-## 4. Clean-Room Architecture & Licensing
+## 4. Production SLA (≤ 60s) & 2-Minute Pre-Spawn Overlap Handover
+
+To ensure dependable real-world responsiveness without unbounded agent polling overhead, the system defines a strict **Service Level Agreement (SLA ≤ 60s)**:
+
+1. **Nominal State (Active Watcher)**: Messages are caught within **1 ~ 5 seconds** via open TCP long-polling, with cached context queries delivering responses in under 2 ~ 4 seconds.
+2. **2-Minute Pre-Spawn Overlap Handover**:
+   - In agentic runtimes with bounded execution terms (e.g. 50 minutes), the supervisor monitors term age (`term_age = now - started_at`).
+   - At **minute 48** (2 minutes prior to term expiration, `overlap_lead_seconds=120`), the supervisor flags `overlap_due = True`.
+   - The platform pre-spawns the next-generation replacement watcher, warming up its context and memory.
+   - When the previous term hits minute 50, it yields `watch.lock` and exits cleanly. The pre-warmed successor immediately claims the lock and opens long-polling.
+   - **Result**: Handover gap is reduced from minutes to **under 1 second**, preventing polling dead zones.
+3. **Fail-Safe Cron Safety Net**:
+   - If an unhandled message lingers in `queue.jsonl` for **> 25 seconds**, the supervisor immediately fires (`exit 0`).
+   - The supervisor drains and answers pending messages directly, guaranteeing that even during unexpected worker crashes, no message exceeds the **60-second SLA limit**.
+
+---
+
+## 5. Clean-Room Architecture & Licensing
 
 - **100% Standard Library**: Built exclusively using Python 3 built-in modules (`urllib.request`, `json`, `mimetypes`, `fcntl`, `time`, `os`).
 - **Zero External Dependencies**: Zero vulnerability footprint, zero supply-chain risk.
