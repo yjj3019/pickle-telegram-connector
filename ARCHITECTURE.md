@@ -77,3 +77,19 @@ To ensure dependable real-world responsiveness without unbounded agent polling o
 - **100% Standard Library**: Built exclusively using Python 3 built-in modules (`urllib.request`, `json`, `mimetypes`, `fcntl`, `time`, `os`).
 - **Zero External Dependencies**: Zero vulnerability footprint, zero supply-chain risk.
 - **MIT License**: Fully independent, clean-room design ensuring clear intellectual property rights and unrestricted deployment in enterprise environments.
+
+---
+
+## 6. Resource & Token Economy (Deployment Recommendations)
+
+When deploying this connector with AI agent runtimes, consider the token/credit economy:
+
+1. **In-Agent Subagent Polling (High Token Consumption)**:
+   - Running the watcher as an internal agent loop (e.g. `subagent_spawn`) repeatedly invokes the LLM runtime across polling slices.
+   - Even with slice durations of 100~240 seconds, continuous 24/7 background execution incurs significant tool-calling token overhead against daily usage quotas.
+   - Furthermore, Bot-to-Bot conversation loops in shared group chats can rapidly compound token usage.
+2. **Standalone Linux systemd Daemon (Recommended: 0 Tokens Spent)**:
+   - For always-on 24/7 duty, deploy the standalone Python daemon on an enterprise Linux server (e.g., RHEL / Rocky Linux) using the provided `scripts/deploy.sh`.
+   - The daemon maintains the persistent long-polling socket natively in Python without triggering any LLM context turns.
+   - Simple queries are answered locally with **zero LLM tokens**, and complex delegation tasks invoke the agent API only on-demand, maximizing efficiency and eliminating quota exhaustion.
+
