@@ -80,16 +80,22 @@ To ensure dependable real-world responsiveness without unbounded agent polling o
 
 ---
 
-## 6. Resource & Token Economy (Deployment Recommendations)
+## 6. Resource & Token Economy (Deployment Models)
 
-When deploying this connector with AI agent runtimes, consider the token/credit economy:
+When deploying this connector with AI agent runtimes, consider the token/credit economy across the three operational models:
 
-1. **In-Agent Subagent Polling (High Token Consumption)**:
-   - Running the watcher as an internal agent loop (e.g. `subagent_spawn`) repeatedly invokes the LLM runtime across polling slices.
-   - Even with slice durations of 100~240 seconds, continuous 24/7 background execution incurs significant tool-calling token overhead against daily usage quotas.
-   - Furthermore, Bot-to-Bot conversation loops in shared group chats can rapidly compound token usage.
-2. **Standalone Linux systemd Daemon (Recommended: 0 Tokens Spent)**:
-   - For always-on 24/7 duty, deploy the standalone Python daemon on an enterprise Linux server (e.g., RHEL / Rocky Linux) using the provided `scripts/deploy.sh`.
-   - The daemon maintains the persistent long-polling socket natively in Python without triggering any LLM context turns.
-   - Simple queries are answered locally with **zero LLM tokens**, and complex delegation tasks invoke the agent API only on-demand, maximizing efficiency and eliminating quota exhaustion.
+1. **Lightweight Fetch Cron Pattern (Recommended In-Agent Standard)**:
+   - **Mechanism**: Replaces persistent 60-minute agent watcher sessions with a lightweight 5-minute scheduled action check (`timeout=0`).
+   - **Zero Idle Tokens**: If no new messages have arrived, the condition program exits cleanly (`exit 1 - Quiet`) without waking the agent or invoking LLM inference.
+   - **On-Demand Single-Turn Wakeup**: Wakes the agent turn strictly when an unhandled message is pending. The agent formulates a reply, dispatches it, records it in `handled.txt`, and terminates the turn immediately.
+   - **Trade-off**: Responses exhibit an average 2.5-minute latency (bounded to 5 minutes maximum), but daily token consumption is slashed by >95%, preventing quota exhaustion.
+
+2. **Standalone Linux systemd Daemon (External Infrastructure Standard)**:
+   - **Mechanism**: Runs the native Python daemon (`pickle-tg daemon`) on an external enterprise Linux server (e.g. RHEL, Rocky Linux) via `systemd`.
+   - **Sub-Second Low Latency**: Holds an open TCP long-polling socket for 0.2~0.5s message ingestion.
+   - **Constraint**: Best suited for dedicated external servers with persistent `/etc` and network access. In ephemeral container environments, surrogate token delegation and VM regeneration can interrupt external daemons.
+
+3. **Continuous In-Agent Watcher Loop (High Token Burn - Avoid for 24/7)**:
+   - Running long-lived subagent polling loops repeatedly incurs tool-calling and prompt context overhead across every slice, leading to rapid token exhaustion during idle hours.
+
 
