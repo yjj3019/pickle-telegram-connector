@@ -1,0 +1,60 @@
+# Architecture & Low-Latency Engine Design
+
+## 1. 1-2s Low-Latency Watcher Mechanism
+
+Traditional polling models query the Telegram Bot API at fixed intervals (e.g. every 1 to 5 minutes), leading to significant delay between when a user sends a message and when the bot responds.
+
+**Pickle Telegram Connector** solves this by leveraging **HTTP Long-Polling** (`getUpdates` with server-side timeout):
+
+```
+User (Telegram)                 Telegram Cloud               Pickle Watcher Engine
+      |                               |                                 |
+      |                               |<==== Holds open TCP socket =====| (timeout=30s)
+      |                               |      (zero latency listener)    |
+      |-- "오늘 일정" (t=0.0s) ------>|                                 |
+      |                               |==== Push payload (t=0.2s) =====>|
+      |                               |                                 |-- Process & Formulate (t=0.5s)
+      |<-- Reply: "일정 0건" (t=1.0s)-|<==== sendMessage (t=0.8s) =====|
+```
+
+1. **Persistent TCP Connection**: The watcher opens a long-polling request with `timeout=30` (or `timeout=50`). Telegram holds the connection open until an update occurs or the timeout expires.
+2. **Push Delivery**: When a user messages the bot, Telegram immediately flushes the update down the existing HTTP stream. Latency from user touch to agent receipt is under **0.2 ~ 0.5 seconds**.
+3. **Sub-second Dispatch**: The watcher unpacks the update, applies security filters (`owner_ids`), atomically appends it to `queue.jsonl`, updates the cursor offset in `state.json`, and triggers the reply.
+4. **File-Lock Concurrency**: Single-instance guarantee is enforced via `fcntl.flock(LOCK_EX | LOCK_NB)`. If a watcher is active, overlapping runs cleanly wait or yield (`LOCKED`).
+
+---
+
+## 2. Supervisor-Watcher Pattern
+
+To balance resource consumption in constrained environments (such as serverless agent platforms or battery-aware containers), the system employs a two-tier supervisor pattern:
+
+```
+[ Supervisor Cron (Every 5-10m) ]
+          │
+          ├── Reads watcher-state.json (Heartbeat age, PID, Term age)
+          │
+          ├── [Case A: Heartbeat Fresh (<180s) & Term < 50m]
+          │       └─► Quiet Exit (0 tokens spent, zero CPU overhead)
+          │
+          └── [Case B: Watcher Dead / Term Expired / Unhandled Messages]
+                  └─► Revive watcher / Clean handover
+```
+
+---
+
+## 3. Security & Access Control
+
+1. **Secure Token Ingestion (Pickle Agent Card & CLI Setup)**:
+   - **Agent Interface**: Never accepts plaintext tokens in chat threads. Instead, uses the Pickle platform's `ask_user` tool with `kind="otp"` and `service="Telegram Bot Token"`. This renders a single-field masked secure input dialog on screen, keeping secrets out of LLM conversation contexts and logs.
+   - **CLI Interface**: `pickle-tg setup` prompts with `getpass.getpass()`, verifies connection with Telegram `getMe`, and writes `local.json` with strict `0600` permissions.
+2. **Private Chat Whitelist**: `owner_ids` restricts direct messaging to specific user IDs (e.g., `123456789`). Unauthorized private messages are rejected without acknowledgement and logged to `dropped.log`.
+3. **Credential Isolation**: Tokens are loaded strictly from environment variables (`TELEGRAM_BOT_TOKEN`) or a non-committed local JSON configuration (`local.json`). No secrets are embedded in source code.
+4. **Redirect Denial**: `NoRedirectHandler` prevents SSRF and redirect hijacking attacks on API requests.
+
+---
+
+## 4. Clean-Room Architecture & Licensing
+
+- **100% Standard Library**: Built exclusively using Python 3 built-in modules (`urllib.request`, `json`, `mimetypes`, `fcntl`, `time`, `os`).
+- **Zero External Dependencies**: Zero vulnerability footprint, zero supply-chain risk.
+- **MIT License**: Fully independent, clean-room design ensuring clear intellectual property rights and unrestricted deployment in enterprise environments.

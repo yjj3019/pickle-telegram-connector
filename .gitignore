@@ -1,0 +1,42 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+
+# Local sensitive configuration & runtime state
+local.json
+watcher-state.json
+*.lock
+*.log
+queue.jsonl
+state.json
+handled.txt
+dropped.log
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+.DS_Store

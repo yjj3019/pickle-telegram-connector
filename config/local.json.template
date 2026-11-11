@@ -1,0 +1,7 @@
+{
+  "bot_token": "YOUR_TELEGRAM_BOT_TOKEN",
+  "bot_id": 123456789,
+  "bot_username": "YourAgentBot",
+  "owner_ids": [123456789],
+  "group_ids": []
+}

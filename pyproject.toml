@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pickle-telegram-connector"
+version = "1.0.0"
+description = "High-performance, sub-second Telegram Bot API connector and low-latency watcher engine for AI agent ecosystems."
+readme = "README.md"
+authors = [
+    { name = "yjj3019", email = "yjj3019@users.noreply.github.com" }
+]
+license = { text = "MIT" }
+requires-python = ">=3.8"
+keywords = ["telegram", "bot", "ai-agent", "pickle", "long-polling", "sub-second", "automation"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Communications :: Chat",
+    "Topic :: Software Development :: Libraries :: Python Modules"
+]
+dependencies = []
+
+[project.scripts]
+pickle-tg = "pickle_tg.cli:main"

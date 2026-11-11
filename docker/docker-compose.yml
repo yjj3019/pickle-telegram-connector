@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  pickle-telegram-connector:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: pickle-telegram-connector
+    restart: always
+    volumes:
+      - ../data:/app/telegram-relay
+      - ../config/local.json:/app/telegram-relay/local.json:ro
+    environment:
+      - TG_RELAY_DIR=/app/telegram-relay
